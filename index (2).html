@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estoque Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+
+.login-user {
+  display:flex; align-items:center; gap:12px;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:12px; padding:10px 16px; font-size:12px;
+}
+.login-user img { width:32px; height:32px; border-radius:50%; }
+.login-user .u-name { color:var(--text); font-weight:500; }
+.login-user .u-email { color:var(--muted); font-size:11px; }
+#logoutBtn {
+  font-size:11px; padding:6px 14px; border-radius:8px;
+  background:transparent; border:1px solid var(--border);
+  color:var(--muted); cursor:pointer; font-family:var(--fm);
+  transition:all .15s;
+}
+#logoutBtn:hover { border-color:var(--red); color:var(--red); }
+</style>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0b0d11; --s1: #111318; --s2: #171b23; --s3: #1e2330; --border: #242a38;
+  --green: #00d68f; --red: #ff4d6d; --yellow: #ffb703; --blue: #4895ef; --purple: #c77dff; --orange: #fb8500;
+  --text: #dce3f0; --muted: #5a637a; --fh: 'Syne', sans-serif; --fm: 'DM Mono', monospace;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--fm); min-height:100vh; }
+body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background: radial-gradient(ellipse 70% 50% at 15% 5%,rgba(0,214,143,.05) 0%,transparent 55%),
+              radial-gradient(ellipse 50% 70% at 85% 95%,rgba(72,149,239,.04) 0%,transparent 55%); }
+.wrap { position:relative; z-index:1; max-width:1440px; margin:0 auto; padding:20px 24px; }
+
+/* NAV TABS */
+.nav-tabs { display:flex; gap:4px; margin-bottom:24px; border-bottom:1px solid var(--border); padding-bottom:0; }
+.nav-tab {
+  font-family:var(--fh); font-size:13px; font-weight:700; padding:10px 20px;
+  border-radius:10px 10px 0 0; border:1px solid transparent; border-bottom:none;
+  background:transparent; color:var(--muted); cursor:pointer; transition:all .15s;
+  position:relative; top:1px;
+}
+.nav-tab:hover { color:var(--text); }
+.nav-tab.active { background:var(--s1); border-color:var(--border); color:var(--green); }
+.tab-page { display:none; }
+.tab-page.active { display:block; }
+
+/* HEADER */
+header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+.logo { font-family:var(--fh); font-size:20px; font-weight:800; }
+.logo em { color:var(--green); font-style:normal; }
+.header-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.chip { font-size:11px; padding:5px 13px; border-radius:20px; border:1px solid var(--border); background:var(--s1); color:var(--muted); }
+.chip.active { border-color:rgba(0,214,143,.3); color:var(--green); background:rgba(0,214,143,.07); }
+.export-btn {
+  font-size:11px; padding:7px 14px; border-radius:10px; border:1px solid rgba(0,214,143,.35);
+  background:rgba(0,214,143,.1); color:var(--green); cursor:pointer; font-family:var(--fm); font-weight:500;
+  transition:all .15s; white-space:nowrap;
+}
+.export-btn:hover { background:rgba(0,214,143,.2); }
+.export-btn:disabled { opacity:.35; cursor:not-allowed; }
+.export-btn.blue { border-color:rgba(72,149,239,.35); background:rgba(72,149,239,.1); color:var(--blue); }
+.export-btn.blue:hover:not(:disabled) { background:rgba(72,149,239,.2); }
+
+/* KPIs */
+.kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:22px; }
+.kpi { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:16px 18px; position:relative; overflow:hidden; }
+.kpi::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.kpi.g::before{background:var(--green);} .kpi.b::before{background:var(--blue);} .kpi.y::before{background:var(--yellow);} .kpi.r::before{background:var(--red);} .kpi.p::before{background:var(--purple);}
+.kpi-lbl { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.9px; margin-bottom:8px; }
+.kpi-val { font-family:var(--fh); font-size:28px; font-weight:800; line-height:1; }
+.kpi.g .kpi-val{color:var(--green);} .kpi.b .kpi-val{color:var(--blue);} .kpi.y .kpi-val{color:var(--yellow);} .kpi.r .kpi-val{color:var(--red);} .kpi.p .kpi-val{color:var(--purple);}
+.kpi-sub { font-size:11px; color:var(--muted); margin-top:5px; }
+
+/* FILTERS */
+.filters { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
+.filters input { flex:1; min-width:220px; background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:9px 14px; color:var(--text); font-family:var(--fm); font-size:12px; outline:none; transition:border-color .2s; }
+.filters input:focus { border-color:var(--green); }
+.filters input::placeholder { color:var(--muted); }
+.filters select { background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:9px 13px; color:var(--text); font-family:var(--fm); font-size:12px; outline:none; cursor:pointer; }
+.filter-btn { font-size:11px; padding:8px 14px; border-radius:10px; border:1px solid var(--border); background:var(--s1); color:var(--muted); cursor:pointer; font-family:var(--fm); transition:all .15s; white-space:nowrap; }
+.filter-btn:hover,.filter-btn.on { border-color:rgba(0,214,143,.35); color:var(--green); background:rgba(0,214,143,.07); }
+.filter-btn.red.on { border-color:rgba(255,77,109,.35); color:var(--red); background:rgba(255,77,109,.07); }
+.filter-btn.yellow.on { border-color:rgba(255,183,3,.35); color:var(--yellow); background:rgba(255,183,3,.07); }
+
+/* LAYOUT */
+.layout { display:grid; grid-template-columns:1fr 370px; gap:18px; align-items:start; }
+
+/* PANEL */
+.panel { background:var(--s1); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+.ph { display:flex; align-items:center; justify-content:space-between; padding:15px 20px; border-bottom:1px solid var(--border); }
+.ph-title { font-family:var(--fh); font-size:14px; font-weight:700; }
+.badge { font-size:10px; padding:3px 10px; border-radius:20px; background:rgba(0,214,143,.1); color:var(--green); border:1px solid rgba(0,214,143,.2); }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; max-height:460px; overflow-y:auto; }
+.table-wrap::-webkit-scrollbar { width:4px; height:4px; }
+.table-wrap::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead { position:sticky; top:0; z-index:2; }
+thead th { background:var(--s2); padding:9px 12px; text-align:left; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; border-bottom:1px solid var(--border); white-space:nowrap; cursor:pointer; user-select:none; }
+thead th:hover { color:var(--text); }
+tbody tr { border-bottom:1px solid rgba(36,42,56,.7); transition:background .12s; cursor:pointer; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:var(--s2); }
+tbody tr.sel { background:rgba(0,214,143,.06); }
+td { padding:9px 12px; vertical-align:middle; white-space:nowrap; }
+.td-name { font-weight:500; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.td-sku { color:var(--muted); font-size:10px; }
+.td-num { font-family:var(--fh); font-weight:700; font-size:14px; }
+.pill { display:inline-block; font-size:10px; padding:2px 9px; border-radius:20px; }
+.p-ok{background:rgba(0,214,143,.12);color:var(--green);} .p-atenc{background:rgba(255,183,3,.12);color:var(--yellow);} .p-naook{background:rgba(255,77,109,.12);color:var(--red);} .p-na{background:rgba(90,99,122,.12);color:var(--muted);}
+.var-pill { font-size:10px; padding:2px 8px; border-radius:6px; background:var(--s3); color:var(--muted); }
+
+/* FORM (right side) */
+.form-panel { display:flex; flex-direction:column; position:sticky; top:20px; }
+.form-body { padding:18px 20px; }
+.sel-box { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; min-height:66px; }
+.sel-lbl { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; }
+.sel-name { font-family:var(--fh); font-size:15px; font-weight:700; color:var(--green); }
+.sel-meta { font-size:11px; color:var(--muted); margin-top:3px; }
+.fg { margin-bottom:13px; }
+.fg label { display:block; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px; }
+.fg input,.fg select,.fg textarea {
+  width:100%; background:var(--s2); border:1px solid var(--border); border-radius:9px;
+  padding:9px 13px; color:var(--text); font-family:var(--fm); font-size:12px; outline:none;
+  transition:border-color .2s, box-shadow .2s;
+}
+.fg input:focus,.fg select:focus,.fg textarea:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(0,214,143,.09); }
+.fg select option { background:var(--s2); }
+.fg textarea { resize:vertical; min-height:56px; }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+/* depot buttons */
+.depot-group { display:flex; flex-direction:column; gap:6px; }
+.depot-btn {
+  padding:9px 12px; border-radius:9px; border:1px solid var(--border); background:var(--s2);
+  color:var(--muted); font-family:var(--fm); font-size:11px; cursor:pointer; text-align:left;
+  transition:all .15s; display:flex; align-items:center; gap:8px;
+}
+.depot-btn:hover { border-color:rgba(72,149,239,.4); color:var(--blue); }
+.depot-btn.active { border-color:var(--blue); color:var(--blue); background:rgba(72,149,239,.1); }
+.depot-btn .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+.depot-btn.active .dot { background:var(--blue); }
+.btn-sub { width:100%; padding:12px; background:var(--green); color:#000; font-family:var(--fh); font-size:13px; font-weight:800; border:none; border-radius:10px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px; transition:opacity .2s, transform .1s; }
+.btn-sub:hover{opacity:.85;} .btn-sub:active{transform:scale(.98);} .btn-sub:disabled{opacity:.35;cursor:not-allowed;}
+.mode-saida .btn-sub{background:var(--red);} .mode-ajuste .btn-sub{background:var(--yellow);}
+.btn-clr { width:100%; padding:9px; background:transparent; color:var(--muted); font-family:var(--fm); font-size:12px; border:1px solid var(--border); border-radius:9px; cursor:pointer; transition:all .2s; margin-top:7px; }
+.btn-clr:hover{border-color:var(--red);color:var(--red);}
+
+/* HISTORY */
+.hist-panel { background:var(--s1); border:1px solid var(--border); border-radius:16px; margin-top:18px; overflow:hidden; }
+.hist-list { max-height:190px; overflow-y:auto; }
+.hist-list::-webkit-scrollbar{width:4px;} .hist-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.hi { display:flex; align-items:flex-start; justify-content:space-between; padding:9px 20px; border-bottom:1px solid rgba(36,42,56,.6); font-size:12px; animation:fadeSlide .25s ease; gap:8px; }
+.hi:last-child{border-bottom:none;}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.hi-l { display:flex; flex-direction:column; gap:2px; }
+.hi-name { color:var(--text); }
+.hi-meta { font-size:10px; color:var(--muted); }
+.hi-r { text-align:right; flex-shrink:0; }
+.hi-qty { font-family:var(--fh); font-weight:700; font-size:13px; }
+.hi-type { font-size:10px; }
+.hi-type.entrada{color:var(--green);} .hi-type.saida{color:var(--red);} .hi-type.ajuste{color:var(--yellow);}
+.no-data { padding:18px 20px; color:var(--muted); font-size:12px; }
+.depot-tag { display:inline-block; font-size:9px; padding:1px 6px; border-radius:4px; background:rgba(72,149,239,.15); color:var(--blue); margin-left:4px; }
+
+/* ═══════════════════ SETTINGS TAB ═══════════════════ */
+.cfg-layout { display:grid; grid-template-columns:1fr 400px; gap:20px; align-items:start; }
+.cfg-table-wrap { overflow-x:auto; max-height:580px; overflow-y:auto; }
+.cfg-table-wrap::-webkit-scrollbar{width:4px;height:4px;} .cfg-table-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.cfg-table { width:100%; border-collapse:collapse; font-size:12px; }
+.cfg-table thead th { background:var(--s2); padding:9px 12px; text-align:left; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.cfg-table tbody tr { border-bottom:1px solid rgba(36,42,56,.7); transition:background .12s; cursor:pointer; }
+.cfg-table tbody tr:last-child{border-bottom:none;}
+.cfg-table tbody tr:hover{background:var(--s2);}
+.cfg-table tbody tr.cfg-sel{background:rgba(251,133,0,.06);}
+td.editable { position:relative; }
+td.editable:hover::after { content:'✏'; position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--muted); }
+
+/* Inline edit form */
+.cfg-form-panel { position:sticky; top:20px; }
+.cfg-form-body { padding:18px 20px; }
+.cfg-section-title { font-family:var(--fh); font-size:13px; font-weight:700; color:var(--orange); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.cfg-section-title::before { content:''; display:inline-block; width:3px; height:16px; background:var(--orange); border-radius:2px; }
+.btn-save { width:100%; padding:12px; background:var(--orange); color:#000; font-family:var(--fh); font-size:13px; font-weight:800; border:none; border-radius:10px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px; transition:opacity .2s, transform .1s; }
+.btn-save:hover{opacity:.85;} .btn-save:active{transform:scale(.98);}
+.btn-del { width:100%; padding:9px; background:transparent; color:var(--red); font-family:var(--fm); font-size:12px; border:1px solid rgba(255,77,109,.3); border-radius:9px; cursor:pointer; transition:all .2s; margin-top:7px; }
+.btn-del:hover{background:rgba(255,77,109,.08);}
+.btn-new { font-size:11px; padding:7px 14px; border-radius:10px; border:1px solid rgba(251,133,0,.35); background:rgba(251,133,0,.1); color:var(--orange); cursor:pointer; font-family:var(--fm); font-weight:500; transition:all .15s; }
+.btn-new:hover{background:rgba(251,133,0,.2);}
+.cfg-empty { padding:24px 20px; color:var(--muted); font-size:12px; text-align:center; }
+.cfg-search { background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:9px 14px; color:var(--text); font-family:var(--fm); font-size:12px; outline:none; transition:border-color .2s; width:100%; }
+.cfg-search:focus{border-color:var(--orange);} .cfg-search::placeholder{color:var(--muted);}
+
+/* TOAST */
+.toast { position:fixed; bottom:24px; right:24px; background:var(--s2); border:1px solid var(--green); color:var(--green); padding:12px 18px; border-radius:12px; font-size:13px; font-family:var(--fm); box-shadow:0 8px 32px rgba(0,0,0,.5); transform:translateY(70px); opacity:0; transition:all .28s; z-index:999; }
+.toast.show{transform:translateY(0);opacity:1;} .toast.err{border-color:var(--red);color:var(--red);} .toast.warn{border-color:var(--orange);color:var(--orange);}
+
+/* MODAL CONFIRM */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; display:none; align-items:center; justify-content:center; }
+.modal-overlay.show{display:flex;}
+.modal { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:28px; max-width:380px; width:90%; }
+.modal-title { font-family:var(--fh); font-size:16px; font-weight:800; margin-bottom:10px; }
+.modal-body { font-size:13px; color:var(--muted); margin-bottom:22px; line-height:1.6; }
+.modal-btns { display:flex; gap:10px; }
+.modal-btns button { flex:1; padding:11px; border-radius:10px; font-family:var(--fh); font-size:13px; font-weight:700; cursor:pointer; border:none; }
+.modal-cancel { background:var(--s2); color:var(--muted); }
+.modal-confirm { background:var(--red); color:#fff; }
+
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr);}.layout,.cfg-layout{grid-template-columns:1fr;}.form-panel,.cfg-form-panel{position:static;}}
+@media(max-width:640px){.kpis{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <div class="logo">ESTOQUE <em>LOG</em></div>
+  <div class="header-right">
+    <span class="chip active" id="dateChip"></span>
+    <button class="export-btn" onclick="exportEstoque()">⬇ Estoque</button>
+    <button class="export-btn blue" onclick="exportHistorico()" id="btnExportHist" disabled>⬇ Histórico</button>
+    <button onclick="serverLogout()" style="font-size:10px;padding:5px 12px;border-radius:8px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:var(--fm);transition:all .15s;margin-left:4px;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">Sair</button>
+  </div>
+</header>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="nav-tab" onclick="switchTab('graficos')">📈 Gráficos</button>
+  <button class="nav-tab" onclick="switchTab('config')">⚙️ Configurações</button>
+</div>
+
+<!-- ═══ DASHBOARD TAB ═══ -->
+<div class="tab-page active" id="tab-dashboard">
+
+  <div class="kpis">
+    <div class="kpi g"><div class="kpi-lbl">Total de SKUs</div><div class="kpi-val" id="kTotal">0</div><div class="kpi-sub">cadastrados</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Valor em Estoque</div><div class="kpi-val" id="kValor">R$0</div><div class="kpi-sub">saldo atual</div></div>
+    <div class="kpi y"><div class="kpi-lbl">Atenção / Baixo</div><div class="kpi-val" id="kAtenc">0</div><div class="kpi-sub">itens com alerta</div></div>
+    <div class="kpi r"><div class="kpi-lbl">Não OK / Crítico</div><div class="kpi-val" id="kNaook">0</div><div class="kpi-sub">abaixo do mínimo</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Saldo Negativo</div><div class="kpi-val" id="kNeg">0</div><div class="kpi-sub">divergência</div></div>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="search" placeholder="🔍  Buscar por nome, SKU ou código de barras..." oninput="render()">
+    <select id="filtVar" onchange="render()">
+      <option value="">Todas as variações</option>
+      <option value="Capinha">Capinha</option>
+      <option value="Película">Película</option>
+      <option value="Genérico">Genérico</option>
+      <option value="Material de Embalo">Material de Embalo</option>
+    </select>
+    <button class="filter-btn red" id="fNaook" onclick="toggleFilter('naook')">🔴 Não OK</button>
+    <button class="filter-btn yellow" id="fAtenc" onclick="toggleFilter('atenc')">🟡 Atenção</button>
+    <button class="filter-btn" id="fBH" onclick="toggleFilter('bh')">📍 Usado em BH</button>
+    <button class="filter-btn" id="fNeg" onclick="toggleFilter('neg')">⚠️ Negativo</button>
+  </div>
+
+  <div class="layout">
+    <!-- TABLE -->
+    <div>
+      <div class="panel">
+        <div class="ph">
+          <span class="ph-title">Produtos</span>
+          <span class="badge" id="totalBadge">0 itens</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th onclick="sortBy('id')">COD <span id="s-id"></span></th>
+              <th onclick="sortBy('sku')">SKU <span id="s-sku"></span></th>
+              <th onclick="sortBy('name')">PRODUTO <span id="s-name"></span></th>
+              <th onclick="sortBy('variacao')">VARIAÇÃO <span id="s-variacao"></span></th>
+              <th onclick="sortBy('qty')" style="text-align:right">SALDO <span id="s-qty"></span></th>
+              <th onclick="sortBy('min')" style="text-align:right">MÍN. <span id="s-min"></span></th>
+              <th onclick="sortBy('unit')" style="text-align:right">VL.UNIT. <span id="s-unit"></span></th>
+              <th>STATUS</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="hist-panel">
+        <div class="ph">
+          <span class="ph-title">Movimentações</span>
+          <span class="badge" id="histBadge">0</span>
+        </div>
+        <div class="hist-list" id="histList"><div class="no-data">Nenhuma movimentação registrada.</div></div>
+      </div>
+    </div>
+
+    <!-- FORM -->
+    <div class="panel form-panel" id="formPanel">
+      <div class="ph">
+        <span class="ph-title">Movimentação</span>
+        <span class="badge" id="modeBadge">Selecione</span>
+      </div>
+      <div class="form-body">
+        <div class="sel-box" id="selBox">
+          <div class="sel-lbl">Produto</div>
+          <div class="sel-name">— Clique em um produto —</div>
+          <div class="sel-meta">Selecione um item na tabela ao lado</div>
+        </div>
+
+        <div class="fg">
+          <label>Tipo de Movimentação</label>
+          <select id="tipoMov" onchange="updateMode()">
+            <option value="saida">↓ Saída / Abatimento</option>
+            <option value="entrada">↑ Entrada / Reposição</option>
+            <option value="ajuste">⚡ Ajuste de Inventário</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Depósito</label>
+          <div class="depot-group">
+            <button type="button" class="depot-btn active" id="dep-bsb" onclick="setDepot('BSB - Brasília')">
+              <span class="dot"></span>BSB — Brasília
+            </button>
+            <button type="button" class="depot-btn" id="dep-bh1" onclick="setDepot('BH - Belo Horizonte (Mangue)')">
+              <span class="dot"></span>BH — Belo Horizonte (Mangue)
+            </button>
+            <button type="button" class="depot-btn" id="dep-bh2" onclick="setDepot('BH - Belo Horizonte (Manguezal)')">
+              <span class="dot"></span>BH — Belo Horizonte (Manguezal)
+            </button>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="fg">
+            <label>Quantidade</label>
+            <input type="number" id="qtd" min="0.001" step="any" value="1" placeholder="0">
+          </div>
+          <div class="fg">
+            <label>Data</label>
+            <input type="date" id="data">
+          </div>
+        </div>
+
+        <div class="fg">
+          <label>Responsável</label>
+          <input type="text" id="resp" placeholder="Nome do responsável">
+        </div>
+
+        <div class="fg">
+          <label>Motivo / Observação</label>
+          <textarea id="motivo" placeholder="Descreva o motivo..."></textarea>
+        </div>
+
+        <button class="btn-sub" id="btnSub" onclick="submitMov()" disabled>REGISTRAR</button>
+        <button class="btn-clr" onclick="clearSel()">Limpar seleção</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONFIG TAB ═══ -->
+<div class="tab-page" id="tab-config">
+  <div class="cfg-layout">
+    <!-- Config table -->
+    <div>
+      <div class="panel">
+        <div class="ph">
+          <span class="ph-title">Cadastro de Produtos</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn-new" onclick="cfgNewProduct()">+ Novo Produto</button>
+            <button class="btn-new" style="border-color:rgba(72,149,239,.35);background:rgba(72,149,239,.1);color:var(--blue);" onclick="document.getElementById('csvInput').click()">📥 Importar CSV</button>
+            <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="importCSV(event)">
+          </div>
+        </div>
+        <div style="padding:12px 20px; border-bottom:1px solid var(--border);">
+          <input class="cfg-search" id="cfgSearch" placeholder="🔍  Buscar produto..." oninput="renderCfgTable()">
+        </div>
+        <div class="cfg-table-wrap">
+          <table class="cfg-table">
+            <thead><tr>
+              <th>CÓD</th><th>SKU</th><th>PRODUTO</th><th>VARIAÇÃO</th><th>UNID</th>
+              <th style="text-align:right">SALDO</th><th style="text-align:right">MÍN</th>
+              <th style="text-align:right">VL.UNIT.</th><th>STATUS</th>
+            </tr></thead>
+            <tbody id="cfgTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit form -->
+    <div class="panel cfg-form-panel" id="cfgFormPanel">
+      <div class="ph">
+        <span class="ph-title" id="cfgFormTitle">Editar Produto</span>
+      </div>
+      <div class="cfg-form-body">
+        <div class="cfg-empty" id="cfgEmptyMsg">Selecione um produto na tabela para editar, ou clique em "Novo Produto".</div>
+        <div id="cfgFormFields" style="display:none">
+          <div class="cfg-section-title" id="cfgSectionLbl">Dados do Produto</div>
+
+          <div class="row2">
+            <div class="fg"><label>Código</label><input type="text" id="cfg-id" placeholder="10001"></div>
+            <div class="fg"><label>SKU</label><input type="text" id="cfg-sku" placeholder="CAP-IPHONE"></div>
+          </div>
+          <div class="fg"><label>Nome do Produto</label><input type="text" id="cfg-name" placeholder="iPhone 16 Pro Max"></div>
+          <div class="row2">
+            <div class="fg">
+              <label>Variação</label>
+              <select id="cfg-variacao">
+                <option>Capinha</option><option>Película</option><option>Genérico</option>
+                <option>Material de Embalo</option><option>Insumo</option><option>Outro</option>
+              </select>
+            </div>
+            <div class="fg"><label>Unid. Medida</label><input type="text" id="cfg-unid" placeholder="Unid"></div>
+          </div>
+          <div class="fg"><label>Descrição</label><input type="text" id="cfg-desc" placeholder="Descrição completa do produto"></div>
+          <div class="fg"><label>Código de Barras</label><input type="text" id="cfg-barcode" placeholder="7890000010000"></div>
+
+          <div class="cfg-section-title" style="margin-top:20px">Valores e Estoque</div>
+
+          <div class="row2">
+            <div class="fg"><label>Valor Unitário (R$)</label><input type="number" id="cfg-unit" min="0" step="0.01" placeholder="0.00"></div>
+            <div class="fg"><label>Estoque Mínimo</label><input type="number" id="cfg-min" min="0" step="1" placeholder="—"></div>
+          </div>
+          <div class="row2">
+            <div class="fg"><label>Saldo Atual</label><input type="number" id="cfg-qty" step="any" placeholder="0"></div>
+            <div class="fg">
+              <label>Status (Saúde)</label>
+              <select id="cfg-saude">
+                <option value="OK">OK</option>
+                <option value="ATENÇÃO">ATENÇÃO</option>
+                <option value="NÃO OK">NÃO OK</option>
+                <option value="">—</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label>Usado em BH?</label>
+            <select id="cfg-usadobh">
+              <option value="true">Sim</option>
+              <option value="false">Não</option>
+            </select>
+          </div>
+
+          <button class="btn-save" onclick="cfgSave()">SALVAR ALTERAÇÕES</button>
+          <button class="btn-del" id="cfgBtnDel" onclick="cfgConfirmDelete()">Excluir produto</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GRÁFICOS TAB ═══ -->
+<div class="tab-page" id="tab-graficos">
+
+  <!-- Filtros do gráfico -->
+  <div class="panel" style="margin-bottom:18px;">
+    <div class="ph">
+      <span class="ph-title">📈 Histórico de Movimentações</span>
+      <span class="badge" id="chartBadge">0 registros</span>
+    </div>
+    <div style="padding:14px 20px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--border);">
+      <div class="fg" style="margin:0;display:flex;align-items:center;gap:8px;">
+        <label style="white-space:nowrap;margin:0;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;">De</label>
+        <input type="date" id="chartFrom" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;">
+      </div>
+      <div class="fg" style="margin:0;display:flex;align-items:center;gap:8px;">
+        <label style="white-space:nowrap;margin:0;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;">Até</label>
+        <input type="date" id="chartTo" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;">
+      </div>
+      <select id="chartDeposito" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;" onchange="renderCharts()">
+        <option value="">Todos os depósitos</option>
+        <option value="BSB - Brasília">BSB - Brasília</option>
+        <option value="BH - Belo Horizonte (Mangue)">BH - Mangue</option>
+        <option value="BH - Belo Horizonte (Manguezal)">BH - Manguezal</option>
+      </select>
+      <button onclick="renderCharts()" style="padding:7px 16px;background:var(--green);color:#000;border:none;border-radius:8px;font-family:var(--fh);font-size:12px;font-weight:700;cursor:pointer;">Filtrar</button>
+      <button onclick="resetChartFilter()" style="padding:7px 14px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-family:var(--fm);font-size:12px;cursor:pointer;">Limpar</button>
+    </div>
+  </div>
+
+  <!-- KPIs do período -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;" id="chartKpis">
+    <div class="kpi g"><div class="kpi-lbl">Entradas</div><div class="kpi-val" id="ck-entrada" style="color:var(--green)">0</div><div class="kpi-sub">no período</div></div>
+    <div class="kpi r"><div class="kpi-lbl">Saídas</div><div class="kpi-val" id="ck-saida" style="color:var(--red)">0</div><div class="kpi-sub">no período</div></div>
+    <div class="kpi y"><div class="kpi-lbl">Ajustes</div><div class="kpi-val" id="ck-ajuste" style="color:var(--yellow)">0</div><div class="kpi-sub">no período</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Movimentações</div><div class="kpi-val" id="ck-total" style="color:var(--blue)">0</div><div class="kpi-sub">total</div></div>
+  </div>
+
+  <!-- Gráfico de barras por dia -->
+  <div class="panel" style="margin-bottom:18px;">
+    <div class="ph"><span class="ph-title">Movimentações por Dia</span></div>
+    <div style="padding:20px;position:relative;height:280px;">
+      <canvas id="chartBar"></canvas>
+      <div id="chartBarEmpty" style="display:none;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">Nenhuma movimentação no período.</div>
+    </div>
+  </div>
+
+  <!-- Grid: pizza tipo + barras por depósito -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;">
+    <div class="panel">
+      <div class="ph"><span class="ph-title">Por Tipo</span></div>
+      <div style="padding:20px;position:relative;height:240px;display:flex;align-items:center;justify-content:center;">
+        <canvas id="chartPie"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span class="ph-title">Por Depósito</span></div>
+      <div style="padding:20px;position:relative;height:240px;">
+        <canvas id="chartDepo"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela de histórico filtrada -->
+  <div class="panel">
+    <div class="ph">
+      <span class="ph-title">Detalhamento</span>
+      <button onclick="exportHistoricoFiltrado()" style="font-size:11px;padding:5px 12px;border-radius:8px;background:rgba(0,214,143,.1);border:1px solid rgba(0,214,143,.3);color:var(--green);cursor:pointer;font-family:var(--fm);">⬇ Exportar</button>
+    </div>
+    <div style="overflow-x:auto;max-height:300px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr id="chartTableHead" style="position:sticky;top:0;z-index:2;">
+            <th style="background:var(--s2);padding:9px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);">Data</th>
+            <th style="background:var(--s2);padding:9px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);">Produto</th>
+            <th style="background:var(--s2);padding:9px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);">Depósito</th>
+            <th style="background:var(--s2);padding:9px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);">Tipo</th>
+            <th style="background:var(--s2);padding:9px 12px;text-align:right;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);">Qtd</th>
+            <th style="background:var(--s2);padding:9px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);">Responsável</th>
+          </tr>
+        </thead>
+        <tbody id="chartTbody"><tr><td colspan="6" style="padding:20px;color:var(--muted);text-align:center;font-size:12px;">Nenhuma movimentação registrada ainda.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CSV IMPORT MODAL -->
+<div class="modal-overlay" id="csvModal" style="display:none;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-title">📥 Importar CSV</div>
+    <div class="modal-body">
+      <p style="margin-bottom:12px;">O arquivo CSV deve ter as seguintes colunas (na primeira linha):</p>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--fm);font-size:11px;color:var(--green);margin-bottom:12px;overflow-x:auto;white-space:nowrap;">
+        Cod, SKU, Categoria, Item/Variação, Unid. Medida, Estoque Saldo, Estoque mínimo, Valor unitário, Saúde do Saldo, Utilizado em BH?
+      </div>
+      <div id="csvPreview" style="margin-bottom:12px;"></div>
+      <div id="csvError" style="color:var(--red);font-size:12px;display:none;"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeCsvModal()">Cancelar</button>
+      <button class="modal-confirm" id="csvConfirmBtn" style="background:var(--blue);" onclick="confirmCsvImport()">Importar</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Confirmar exclusão</div>
+    <div class="modal-body" id="modalBody">Tem certeza que deseja excluir este produto?</div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="modal-confirm" id="modalConfirmBtn">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════ DATA ═══════════════
+const RAW = [{"id":"10045","sku":"ACC-ALLUBO","name":"Allubox","variacao":"Material de Embalo","unid":"Unid","qty":-149.0,"inicial":0.0,"min":null,"unit":3.5,"saude":"","usado_bh":true,"desc":"Allubox","barcode":"7890000010045"},{"id":"10046","sku":"ACC-ALLUPH","name":"Alluphone","variacao":"Material de Embalo","unid":"Unid","qty":-149.0,"inicial":712.0,"min":null,"unit":3.0,"saude":"","usado_bh":true,"desc":"Alluphone","barcode":"7890000010046"},{"id":"10047","sku":"ACC-BALFIN","name":"Balas Fini","variacao":"Genérico","unid":"Unid","qty":-149.0,"inicial":826.0,"min":null,"unit":0.72,"saude":"","usado_bh":true,"desc":"Balas Fini","barcode":"7890000010047"},{"id":"10063","sku":"ACC-BOBST","name":"Bobina de Stretch","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":8.0,"min":null,"unit":197.9,"saude":"","usado_bh":true,"desc":"Bobina de Stretch","barcode":"7890000010063"},{"id":"10067","sku":"LGT-GEN","name":"Cabo lightning","variacao":"Genérico","unid":"Unid","qty":2300.0,"inicial":2300.0,"min":1229,"unit":50.0,"saude":"OK","usado_bh":true,"desc":"Cabo lightning","barcode":"7890000010067"},{"id":"10066","sku":"USB-C-GEN","name":"Cabo USB-C","variacao":"Genérico","unid":"Unid","qty":600.0,"inicial":600.0,"min":410,"unit":50.0,"saude":"OK","usado_bh":true,"desc":"Cabo USB-C","barcode":"7890000010066"},{"id":"10049","sku":"ACC-CARREG","name":"Carregadores","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":600.0,"min":null,"unit":35.0,"saude":"","usado_bh":true,"desc":"Carregadores","barcode":"7890000010049"},{"id":"10048","sku":"ACC-CABOS","name":"Cabos","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":0,"unit":50.0,"saude":"OK","usado_bh":false,"desc":"Cabos","barcode":"7890000010048"},{"id":"10060","sku":"ACC-CAISOM","name":"Caixinha de Som","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":null,"unit":50.0,"saude":"OK","usado_bh":false,"desc":"Caixinha de Som","barcode":"7890000010060"},{"id":"10051","sku":"ACC-CARAT","name":"Cartão AT","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":null,"unit":1.0,"saude":"","usado_bh":false,"desc":"Cartão AT","barcode":"7890000010051"},{"id":"10052","sku":"ACC-CHEETO","name":"Cheetos","variacao":"Genérico","unid":"Saco","qty":0.0,"inicial":0.0,"min":null,"unit":150.0,"saude":"","usado_bh":true,"desc":"Cheetos","barcode":"7890000010052"},{"id":"10061","sku":"ACC-DOLEIR","name":"Doleira","variacao":"Genérico","unid":"Unid","qty":-0.1862,"inicial":1750.0,"min":0,"unit":1.0,"saude":"OK","usado_bh":true,"desc":"Doleira","barcode":"7890000010061"},{"id":"10076","sku":"ACC-ETIQ10X15","name":"Etiqueta 100MM X 150MM","variacao":"Genérico","unid":"Unid","qty":-324.0,"inicial":41.0,"min":null,"unit":0.06,"saude":"","usado_bh":true,"desc":"Etiqueta 100MM X 150MM","barcode":"7890000010076"},{"id":"10077","sku":"ACC-ETIQ5X4","name":"Etiqueta 50MM X 40MM","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":null,"unit":0.02,"saude":"","usado_bh":false,"desc":"Etiqueta 50MM X 40MM","barcode":"7890000010077"},{"id":"10075","sku":"ACC-ETIQ9X4","name":"Etiqueta 90MM X 40MM","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":null,"unit":182.0,"saude":"","usado_bh":true,"desc":"Etiqueta 90MM X 40MM","barcode":"7890000010075"},{"id":"10064","sku":"ACC-FITADH","name":"Fitas Adesivas","variacao":"Genérico","unid":"Unid","qty":64.0,"inicial":64.0,"min":null,"unit":13.0,"saude":"","usado_bh":true,"desc":"Fitas Adesivas","barcode":"7890000010064"},{"id":"10069","sku":"FONE-GS","name":"Fone GS","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":0,"unit":109.0,"saude":"OK","usado_bh":false,"desc":"Fone GS","barcode":"7890000010069"},{"id":"10021","sku":"CAP-IPAD10GEN","name":"iPad 10ª Geração","variacao":"Capinha","unid":"Unid","qty":0.0,"inicial":0.0,"min":31,"unit":39.0,"saude":"NÃO OK","usado_bh":true,"desc":"Capinha iPad 10ª Geração","barcode":"7890000010021"},{"id":"10020","sku":"CAP-IPADAIR5GEN","name":"iPad Air 5ª Geração","variacao":"Capinha","unid":"Unid","qty":12.0,"inicial":12.0,"min":7,"unit":39.0,"saude":"OK","usado_bh":true,"desc":"Capinha iPad Air 5ª Geração","barcode":"7890000010020"},{"id":"10004","sku":"CAP-IP11PM","name":"iPhone 11 Pro Max","variacao":"Capinha","unid":"Unid","qty":226.0,"inicial":226.0,"min":4,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 11 Pro Max","barcode":"7890000010004"},{"id":"10024","sku":"PEL-IP11PM","name":"iPhone 11 Pro Max","variacao":"Película","unid":"Unid","qty":251.0,"inicial":251.0,"min":4,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 11 Pro Max","barcode":"7890000010024"},{"id":"10003","sku":"CAP-IP11P","name":"iPhone 11 Pro","variacao":"Capinha","unid":"Unid","qty":264.0,"inicial":264.0,"min":5,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 11 Pro","barcode":"7890000010003"},{"id":"10023","sku":"PEL-IP11P","name":"iPhone 11 Pro","variacao":"Película","unid":"Unid","qty":316.0,"inicial":316.0,"min":5,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 11 Pro","barcode":"7890000010023"},{"id":"10002","sku":"CAP-IP11","name":"iPhone 11","variacao":"Capinha","unid":"Unid","qty":140.0,"inicial":140.0,"min":99,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 11","barcode":"7890000010002"},{"id":"10022","sku":"PEL-IP11","name":"iPhone 11","variacao":"Película","unid":"Unid","qty":167.0,"inicial":167.0,"min":99,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 11","barcode":"7890000010022"},{"id":"10007","sku":"CAP-IP12PM","name":"iPhone 12 Pro Max","variacao":"Capinha","unid":"Unid","qty":232.0,"inicial":232.0,"min":20,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 12 Pro Max","barcode":"7890000010007"},{"id":"10027","sku":"PEL-IP12PM","name":"iPhone 12 Pro Max","variacao":"Película","unid":"Unid","qty":299.0,"inicial":299.0,"min":20,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 12 Pro Max","barcode":"7890000010027"},{"id":"10006","sku":"CAP-IP12P","name":"iPhone 12 Pro","variacao":"Capinha","unid":"Unid","qty":176.0,"inicial":176.0,"min":10,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 12 Pro","barcode":"7890000010006"},{"id":"10026","sku":"PEL-IP12P","name":"iPhone 12 Pro","variacao":"Película","unid":"Unid","qty":226.0,"inicial":226.0,"min":10,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 12 Pro","barcode":"7890000010026"},{"id":"10005","sku":"CAP-IP12","name":"iPhone 12","variacao":"Capinha","unid":"Unid","qty":216.0,"inicial":216.0,"min":54,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 12","barcode":"7890000010005"},{"id":"10025","sku":"PEL-IP12","name":"iPhone 12","variacao":"Película","unid":"Unid","qty":236.0,"inicial":236.0,"min":54,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 12","barcode":"7890000010025"},{"id":"10010","sku":"CAP-IP13PM","name":"iPhone 13 Pro Max","variacao":"Capinha","unid":"Unid","qty":139.0,"inicial":139.0,"min":56,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 13 Pro Max","barcode":"7890000010010"},{"id":"10030","sku":"PEL-IP13PM","name":"iPhone 13 Pro Max","variacao":"Película","unid":"Unid","qty":134.0,"inicial":134.0,"min":56,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 13 Pro Max","barcode":"7890000010030"},{"id":"10009","sku":"CAP-IP13P","name":"iPhone 13 Pro","variacao":"Capinha","unid":"Unid","qty":215.0,"inicial":215.0,"min":41,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 13 Pro","barcode":"7890000010009"},{"id":"10029","sku":"PEL-IP13P","name":"iPhone 13 Pro","variacao":"Película","unid":"Unid","qty":206.0,"inicial":206.0,"min":41,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 13 Pro","barcode":"7890000010029"},{"id":"10008","sku":"CAP-IP13","name":"iPhone 13","variacao":"Capinha","unid":"Unid","qty":141.0,"inicial":141.0,"min":316,"unit":16.55,"saude":"NÃO OK","usado_bh":true,"desc":"Capinha iPhone 13","barcode":"7890000010008"},{"id":"10028","sku":"PEL-IP13","name":"iPhone 13","variacao":"Película","unid":"Unid","qty":141.0,"inicial":141.0,"min":316,"unit":5.95,"saude":"NÃO OK","usado_bh":true,"desc":"Película iPhone 13","barcode":"7890000010028"},{"id":"10013","sku":"CAP-IP14PM","name":"iPhone 14 Pro Max","variacao":"Capinha","unid":"Unid","qty":291.0,"inicial":291.0,"min":94,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 14 Pro Max","barcode":"7890000010013"},{"id":"10033","sku":"PEL-IP14PM","name":"iPhone 14 Pro Max","variacao":"Película","unid":"Unid","qty":245.0,"inicial":245.0,"min":94,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 14 Pro Max","barcode":"7890000010033"},{"id":"10012","sku":"CAP-IP14P","name":"iPhone 14 Pro","variacao":"Capinha","unid":"Unid","qty":36.0,"inicial":36.0,"min":85,"unit":16.55,"saude":"NÃO OK","usado_bh":true,"desc":"Capinha iPhone 14 Pro","barcode":"7890000010012"},{"id":"10032","sku":"PEL-IP14P","name":"iPhone 14 Pro","variacao":"Película","unid":"Unid","qty":92.0,"inicial":92.0,"min":85,"unit":5.95,"saude":"ATENÇÃO","usado_bh":true,"desc":"Película iPhone 14 Pro","barcode":"7890000010032"},{"id":"10011","sku":"CAP-IP14","name":"iPhone 14","variacao":"Capinha","unid":"Unid","qty":875.0,"inicial":875.0,"min":315,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 14","barcode":"7890000010011"},{"id":"10031","sku":"PEL-IP14","name":"iPhone 14","variacao":"Película","unid":"Unid","qty":875.0,"inicial":875.0,"min":315,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 14","barcode":"7890000010031"},{"id":"10016","sku":"CAP-IP15PM","name":"iPhone 15 Pro Max","variacao":"Capinha","unid":"Unid","qty":128.0,"inicial":128.0,"min":104,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 15 Pro Max","barcode":"7890000010016"},{"id":"10036","sku":"PEL-IP15PM","name":"iPhone 15 Pro Max","variacao":"Película","unid":"Unid","qty":153.0,"inicial":153.0,"min":104,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 15 Pro Max","barcode":"7890000010036"},{"id":"10015","sku":"CAP-IP15P","name":"iPhone 15 Pro","variacao":"Capinha","unid":"Unid","qty":87.0,"inicial":87.0,"min":74,"unit":16.55,"saude":"ATENÇÃO","usado_bh":true,"desc":"Capinha iPhone 15 Pro","barcode":"7890000010015"},{"id":"10035","sku":"PEL-IP15P","name":"iPhone 15 Pro","variacao":"Película","unid":"Unid","qty":121.0,"inicial":121.0,"min":74,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 15 Pro","barcode":"7890000010035"},{"id":"10014","sku":"CAP-IP15","name":"iPhone 15","variacao":"Capinha","unid":"Unid","qty":1.0,"inicial":1.0,"min":191,"unit":16.55,"saude":"NÃO OK","usado_bh":true,"desc":"Capinha iPhone 15","barcode":"7890000010014"},{"id":"10034","sku":"PEL-IP15","name":"iPhone 15","variacao":"Película","unid":"Unid","qty":15.0,"inicial":15.0,"min":191,"unit":5.95,"saude":"NÃO OK","usado_bh":true,"desc":"Película iPhone 15","barcode":"7890000010034"},{"id":"10019","sku":"CAP-IP16PM","name":"iPhone 16 Pro Max","variacao":"Capinha","unid":"Unid","qty":107.0,"inicial":107.0,"min":21,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 16 Pro Max","barcode":"7890000010019"},{"id":"10039","sku":"PEL-IP16PM","name":"iPhone 16 Pro Max","variacao":"Película","unid":"Unid","qty":156.0,"inicial":156.0,"min":21,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 16 Pro Max","barcode":"7890000010039"},{"id":"10018","sku":"CAP-IP16P","name":"iPhone 16 Pro","variacao":"Capinha","unid":"Unid","qty":107.0,"inicial":107.0,"min":12,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha iPhone 16 Pro","barcode":"7890000010018"},{"id":"10038","sku":"PEL-IP16P","name":"iPhone 16 Pro","variacao":"Película","unid":"Unid","qty":50.0,"inicial":50.0,"min":12,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película iPhone 16 Pro","barcode":"7890000010038"},{"id":"10017","sku":"CAP-IP16","name":"iPhone 16","variacao":"Capinha","unid":"Unid","qty":0.0,"inicial":0.0,"min":7,"unit":16.55,"saude":"NÃO OK","usado_bh":true,"desc":"Capinha iPhone 16","barcode":"7890000010017"},{"id":"10037","sku":"PEL-IP16","name":"iPhone 16","variacao":"Película","unid":"Unid","qty":0.0,"inicial":0.0,"min":7,"unit":5.95,"saude":"NÃO OK","usado_bh":true,"desc":"Película iPhone 16","barcode":"7890000010037"},{"id":"10053","sku":"ACC-LACCAI","name":"Lacre Caixa","variacao":"Genérico","unid":"Unid","qty":5000.0,"inicial":5000.0,"min":null,"unit":0.31,"saude":"","usado_bh":true,"desc":"Lacre Caixa","barcode":"7890000010053"},{"id":"10056","sku":"ACC-PAPA4","name":"Papel A4","variacao":"Genérico","unid":"Pct","qty":5.0,"inicial":5.0,"min":null,"unit":27.0,"saude":"","usado_bh":true,"desc":"Papel A4","barcode":"7890000010056"},{"id":"10079","sku":"PLA-BOLHA","name":"Plástico Bolha","variacao":"Genérico","unid":"Rolo","qty":1.0,"inicial":1.0,"min":2,"unit":115.51,"saude":"NÃO OK","usado_bh":true,"desc":"Plástico Bolha","barcode":"7890000010079"},{"id":"10044","sku":"PEL-GRITX2","name":"POLAR Grit X2","variacao":"Película","unid":"Unid","qty":10.0,"inicial":10.0,"min":1,"unit":6.95,"saude":"OK","usado_bh":true,"desc":"Película POLAR Grit X2","barcode":"7890000010044"},{"id":"10043","sku":"PEL-IGNITE3","name":"POLAR Ignite3","variacao":"Película","unid":"Unid","qty":7.0,"inicial":7.0,"min":1,"unit":6.95,"saude":"OK","usado_bh":true,"desc":"Película POLAR Ignite3","barcode":"7890000010043"},{"id":"10040","sku":"PEL-PACERPRO","name":"POLAR Pacer/Pacer Pro","variacao":"Película","unid":"Unid","qty":12.0,"inicial":12.0,"min":1,"unit":6.95,"saude":"OK","usado_bh":true,"desc":"Película POLAR Pacer Pro","barcode":"7890000010040"},{"id":"10042","sku":"PEL-VANTAGEM3","name":"POLAR Vantage M3","variacao":"Película","unid":"Unid","qty":8.0,"inicial":8.0,"min":1,"unit":6.95,"saude":"OK","usado_bh":true,"desc":"Película POLAR Vantage M3","barcode":"7890000010042"},{"id":"10062","sku":"ACC-PORCRT","name":"Porta Cartão","variacao":"Genérico","unid":"Unid","qty":0.0,"inicial":0.0,"min":0,"unit":1.0,"saude":"OK","usado_bh":false,"desc":"Porta Cartão","barcode":"7890000010062"},{"id":"10059","sku":"ACC-POWBAN","name":"Power Bank","variacao":"Genérico","unid":"Unid","qty":26.0,"inicial":26.0,"min":0,"unit":50.0,"saude":"OK","usado_bh":true,"desc":"Power Bank","barcode":"7890000010059"},{"id":"10057","sku":"ACC-RIBBON","name":"Ribbon","variacao":"Genérico","unid":"Rolo","qty":56.0,"inicial":56.0,"min":null,"unit":7.75,"saude":"","usado_bh":true,"desc":"Ribbon 110MM x 74MM","barcode":"7890000010057"},{"id":"10054","sku":"ACC-SAQNR","name":"Saquinho NR","variacao":"Genérico","unid":"Unid","qty":3000.0,"inicial":3000.0,"min":null,"unit":0.2,"saude":"","usado_bh":true,"desc":"Saco embalo NF 13CM X 15CM","barcode":"7890000010054"},{"id":"10081","sku":"CAP-MACPRO16","name":"Macbook Pro 16\"","variacao":"Capinha","unid":"unid","qty":0.0,"inicial":0.0,"min":0,"unit":110.0,"saude":"OK","usado_bh":false,"desc":"Capa macbook 16\"","barcode":"7890000010081"},{"id":"10082","sku":"CAP-IP16PROFIBER","name":"iPhone 16 Pro Fiber","variacao":"Capinha","unid":"unid","qty":0.0,"inicial":0.0,"min":0,"unit":35.0,"saude":"OK","usado_bh":false,"desc":"Capinha iPhone 16 Pro fiber","barcode":"7890000010082"},{"id":"10083","sku":"PEL-IP16PAAPLIC","name":"iPhone 16 Pro AAPLIC","variacao":"Película","unid":"unid","qty":0.0,"inicial":0.0,"min":0,"unit":12.0,"saude":"OK","usado_bh":false,"desc":"Película iPhone 16 Pro AAPLIC","barcode":"7890000010083"},{"id":"10084","sku":"CAP-GALAXYA05SLIM","name":"Galaxy A05","variacao":"Capinha","unid":"unid","qty":0.0,"inicial":0.0,"min":0,"unit":16.95,"saude":"OK","usado_bh":false,"desc":"Capinha Galaxy A05 Slim","barcode":"7890000010084"},{"id":"10085","sku":"PEL-GALAXYA05FIBER","name":"Galaxy A05","variacao":"Película","unid":"unid","qty":0.0,"inicial":0.0,"min":0,"unit":9.0,"saude":"OK","usado_bh":false,"desc":"Película Galaxy A05 fiber","barcode":"7890000010085"},{"id":"10086","sku":"CAP-TABS9FE+","name":"TAB S9 FE+","variacao":"Capinha","unid":"unid","qty":0.0,"inicial":0.0,"min":0,"unit":80.0,"saude":"OK","usado_bh":false,"desc":"CapinhaTab S9 FE+","barcode":"7890000010086"},{"id":"10089","sku":"CAP-SAM-A16","name":"Samsung A16","variacao":"Capinha","unid":"Unid","qty":80.0,"inicial":80.0,"min":0,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Capinha Samsung A16","barcode":"7890000010089"},{"id":"10090","sku":"PEL-SAM-A16","name":"Samsung A16","variacao":"Película","unid":"Unid","qty":80.0,"inicial":80.0,"min":0,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Película Samsung A16","barcode":"7890000010090"},{"id":"10091","sku":"CAP-SAM-TAB-A9","name":"samsung tablet A9","variacao":"Capinha","unid":"","qty":135.0,"inicial":135.0,"min":0,"unit":0,"saude":"OK","usado_bh":true,"desc":"samsung tablet A9 Capinha","barcode":"7890000010091"},{"id":"10092","sku":"PEL-SAM--TAB-A9","name":"samsung tablet A9","variacao":"Película","unid":"","qty":23.0,"inicial":23.0,"min":0,"unit":0,"saude":"OK","usado_bh":true,"desc":"samsung tablet A9 Película","barcode":"7890000010092"},{"id":"10093","sku":"CAP-SAM-S25","name":"Samsung S25","variacao":"Capinha","unid":"Unid","qty":120.0,"inicial":120.0,"min":0,"unit":16.55,"saude":"OK","usado_bh":true,"desc":"Samsung S25 Capinha","barcode":"7890000010093"},{"id":"10094","sku":"PEL-SAM-S25","name":"Samsung S25","variacao":"Película","unid":"Unid","qty":0.0,"inicial":0.0,"min":0,"unit":5.95,"saude":"OK","usado_bh":true,"desc":"Samsung S25 Película","barcode":"7890000010094"}];
+
+let products = JSON.parse(JSON.stringify(RAW));
+let history = [];
+let selId = null, sortCol = 'id', sortDir = 1;
+let filters = { naook:false, atenc:false, bh:false, neg:false };
+let selectedDepot = 'BSB - Brasília';
+let cfgSelId = null, cfgIsNew = false;
+
+// ═══ INIT ═══
+function init() {
+  const now = new Date();
+  document.getElementById('dateChip').textContent = now.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('data').value = now.toISOString().split('T')[0];
+  render(); updateKPIs(); renderCfgTable();
+}
+
+// ═══ TABS ═══
+function switchTab(name) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'graficos') renderCharts();
+}
+
+// ═══ DEPOT ═══
+const depotMap = {'BSB - Brasília':'dep-bsb','BH - Belo Horizonte (Mangue)':'dep-bh1','BH - Belo Horizonte (Manguezal)':'dep-bh2'};
+function setDepot(d) {
+  selectedDepot = d;
+  Object.values(depotMap).forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById(depotMap[d]).classList.add('active');
+}
+
+// ═══ FILTERS ═══
+function toggleFilter(k) {
+  filters[k] = !filters[k];
+  document.getElementById({naook:'fNaook',atenc:'fAtenc',bh:'fBH',neg:'fNeg'}[k]).classList.toggle('on',filters[k]);
+  render();
+}
+
+function getFiltered() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const fv = document.getElementById('filtVar').value;
+  return products.filter(p => {
+    if (q && !p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q) && !p.barcode.includes(q)) return false;
+    if (fv && p.variacao !== fv) return false;
+    if (filters.naook && p.saude !== 'NÃO OK') return false;
+    if (filters.atenc && p.saude !== 'ATENÇÃO') return false;
+    if (filters.bh && !p.usado_bh) return false;
+    if (filters.neg && p.qty >= 0) return false;
+    return true;
+  }).sort((a,b) => {
+    let av = a[sortCol]??-Infinity, bv = b[sortCol]??-Infinity;
+    if (typeof av==='string') { av=av.toLowerCase(); bv=(bv+'').toLowerCase(); }
+    return av<bv?-sortDir:av>bv?sortDir:0;
+  });
+}
+
+// ═══ RENDER TABLE ═══
+function render() {
+  const list = getFiltered();
+  document.getElementById('totalBadge').textContent = `${list.length} itens`;
+  document.getElementById('tbody').innerHTML = list.map(p => {
+    const qtyColor = p.qty<0?'var(--red)':p.saude==='NÃO OK'?'var(--red)':p.saude==='ATENÇÃO'?'var(--yellow)':'var(--green)';
+    const fmtQty = Number.isInteger(p.qty)?p.qty:p.qty.toFixed(4);
+    return `<tr class="${selId===p.id?'sel':''}" onclick="selectProduct('${p.id}')">
+      <td class="td-sku">${p.id}</td><td class="td-sku">${p.sku}</td>
+      <td class="td-name" title="${p.desc}">${p.name}</td>
+      <td><span class="var-pill">${p.variacao}</span></td>
+      <td style="text-align:right"><span class="td-num" style="color:${qtyColor}">${fmtQty}</span></td>
+      <td style="text-align:right;color:var(--muted)">${p.min!==null?p.min:'—'}</td>
+      <td style="text-align:right;color:var(--muted)">${p.unit?'R$ '+p.unit.toFixed(2):'—'}</td>
+      <td>${statusPill(p.saude)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function statusPill(s) {
+  if(s==='OK') return `<span class="pill p-ok">OK</span>`;
+  if(s==='ATENÇÃO') return `<span class="pill p-atenc">ATENÇÃO</span>`;
+  if(s==='NÃO OK') return `<span class="pill p-naook">NÃO OK</span>`;
+  return `<span class="pill p-na">—</span>`;
+}
+
+function sortBy(col) {
+  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}
+  document.querySelectorAll('thead th span').forEach(s=>s.textContent='');
+  const el=document.getElementById('s-'+col);
+  if(el) el.textContent=sortDir===1?' ↑':' ↓';
+  render();
+}
+
+// ═══ SELECT ═══
+function selectProduct(id) {
+  selId = id;
+  const p = products.find(x=>x.id===id);
+  const fmtQty = Number.isInteger(p.qty)?p.qty:p.qty.toFixed(4);
+  document.getElementById('selBox').innerHTML = `
+    <div class="sel-lbl">Produto Selecionado</div>
+    <div class="sel-name">${p.name} <span style="color:var(--muted);font-size:12px;font-weight:400">· ${p.variacao}</span></div>
+    <div class="sel-meta">${p.sku} · Saldo: <strong style="color:var(--text)">${fmtQty} ${p.unid}</strong> · ${p.unit?'R$ '+p.unit.toFixed(2)+'/un.':'sem valor'}</div>`;
+  document.getElementById('btnSub').disabled = false;
+  render();
+}
+
+function clearSel() {
+  selId = null;
+  document.getElementById('selBox').innerHTML = `<div class="sel-lbl">Produto</div><div class="sel-name">— Clique em um produto —</div><div class="sel-meta">Selecione um item na tabela ao lado</div>`;
+  document.getElementById('btnSub').disabled = true;
+  render();
+}
+
+// ═══ MODE ═══
+function updateMode() {
+  const t = document.getElementById('tipoMov').value;
+  document.getElementById('formPanel').className = 'panel form-panel mode-'+t;
+  const badge = document.getElementById('modeBadge');
+  const m = {saida:['Abatimento','var(--red)','rgba(255,77,109,.2)'],entrada:['Reposição','var(--green)','rgba(0,214,143,.2)'],ajuste:['Ajuste','var(--yellow)','rgba(255,183,3,.2)']};
+  badge.textContent=m[t][0]; badge.style.color=m[t][1]; badge.style.background=m[t][2];
+}
+
+// ═══ SUBMIT MOV ═══
+function submitMov() {
+  if(!selId) return;
+  const p = products.find(x=>x.id===selId);
+  const tipo = document.getElementById('tipoMov').value;
+  const qtdRaw = parseFloat(document.getElementById('qtd').value);
+  const data = document.getElementById('data').value;
+  const resp = document.getElementById('resp').value.trim();
+  const motivo = document.getElementById('motivo').value.trim();
+
+  if(!qtdRaw||qtdRaw<=0){toast('Informe uma quantidade válida.',true);return;}
+  if(!resp){toast('Informe o responsável.',true);return;}
+
+  const antes = p.qty;
+  if(tipo==='saida'){
+    if(qtdRaw>p.qty){toast(`⚠️ Saldo insuficiente (atual: ${p.qty})`,true);return;}
+    p.qty = Math.round((p.qty-qtdRaw)*10000)/10000;
+  } else if(tipo==='entrada'){
+    p.qty = Math.round((p.qty+qtdRaw)*10000)/10000;
+  } else {
+    p.qty = qtdRaw;
+  }
+  if(p.min!==null) p.saude = p.qty<p.min?'NÃO OK':p.qty<=p.min*1.15?'ATENÇÃO':'OK';
+
+  const fmt = new Intl.DateTimeFormat('pt-BR').format(new Date(data+'T12:00'));
+  history.unshift({name:p.name,sku:p.sku,variacao:p.variacao,tipo,qty:qtdRaw,antes,depois:p.qty,data:fmt,resp,motivo,deposito:selectedDepot});
+
+  render(); updateKPIs(); renderHistory();
+  document.getElementById('btnExportHist').disabled = false;
+  selectProduct(selId);
+  const sign = tipo==='saida'?'-':tipo==='entrada'?'+':'=';
+  toast(`✓ ${p.name} · ${sign}${qtdRaw} · ${selectedDepot.split(' — ')[0]||selectedDepot}`);
+  document.getElementById('qtd').value=1;
+  document.getElementById('motivo').value='';
+}
+
+// ═══ KPIs ═══
+function updateKPIs() {
+  const total=products.length;
+  const valor=products.reduce((s,p)=>s+Math.max(p.qty,0)*p.unit,0);
+  const atenc=products.filter(p=>p.saude==='ATENÇÃO').length;
+  const naook=products.filter(p=>p.saude==='NÃO OK').length;
+  const neg=products.filter(p=>p.qty<0).length;
+  document.getElementById('kTotal').textContent=total;
+  const v=valor>=1000000?(valor/1000000).toFixed(1)+'M':valor>=1000?(valor/1000).toFixed(1)+'k':valor.toFixed(0);
+  document.getElementById('kValor').textContent='R$'+v;
+  document.getElementById('kAtenc').textContent=atenc;
+  document.getElementById('kNaook').textContent=naook;
+  document.getElementById('kNeg').textContent=neg;
+}
+
+// ═══ HISTORY ═══
+function renderHistory() {
+  const list=document.getElementById('histList');
+  document.getElementById('histBadge').textContent=history.length;
+  if(!history.length){list.innerHTML='<div class="no-data">Nenhuma movimentação registrada.</div>';return;}
+  list.innerHTML=history.map(h=>`
+    <div class="hi">
+      <div class="hi-l">
+        <span class="hi-name">${h.name} <span style="color:var(--muted);font-size:10px">${h.variacao}</span><span class="depot-tag">${h.deposito}</span></span>
+        <span class="hi-meta">${h.data} · ${h.resp}${h.motivo?' · '+h.motivo.substring(0,32):''}</span>
+        <span class="hi-meta" style="color:var(--muted)">Antes: ${h.antes} → Depois: ${h.depois}</span>
+      </div>
+      <div class="hi-r">
+        <div class="hi-qty" style="color:${h.tipo==='saida'?'var(--red)':h.tipo==='entrada'?'var(--green)':'var(--yellow)'}">${h.tipo==='saida'?'-':h.tipo==='entrada'?'+':'='}${h.qty}</div>
+        <div class="hi-type ${h.tipo}">${h.tipo==='saida'?'Saída':h.tipo==='entrada'?'Entrada':'Ajuste'}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════ CONFIG TAB ═══════════════
+function renderCfgTable() {
+  const q = (document.getElementById('cfgSearch').value||'').toLowerCase();
+  const list = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.id.includes(q));
+  document.getElementById('cfgTbody').innerHTML = list.map(p => {
+    const fmtQty = Number.isInteger(p.qty)?p.qty:p.qty.toFixed(2);
+    return `<tr class="${cfgSelId===p.id?'cfg-sel':''}" onclick="cfgSelect('${p.id}')">
+      <td class="td-sku">${p.id}</td><td class="td-sku">${p.sku}</td>
+      <td class="td-name" title="${p.desc}">${p.name}</td>
+      <td><span class="var-pill">${p.variacao}</span></td>
+      <td style="color:var(--muted);font-size:10px">${p.unid||'—'}</td>
+      <td style="text-align:right;font-family:var(--fh);font-weight:700;color:${p.qty<0?'var(--red)':'var(--green)'}">${fmtQty}</td>
+      <td style="text-align:right;color:var(--muted)">${p.min!==null?p.min:'—'}</td>
+      <td style="text-align:right;color:var(--muted)">${p.unit?'R$ '+p.unit.toFixed(2):'—'}</td>
+      <td>${statusPill(p.saude)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function cfgSelect(id) {
+  cfgSelId = id; cfgIsNew = false;
+  const p = products.find(x=>x.id===id);
+  document.getElementById('cfgFormTitle').textContent = 'Editar Produto';
+  document.getElementById('cfgSectionLbl').textContent = 'Dados do Produto';
+  document.getElementById('cfgBtnDel').style.display = '';
+  document.getElementById('cfgEmptyMsg').style.display = 'none';
+  document.getElementById('cfgFormFields').style.display = 'block';
+  document.getElementById('cfg-id').value = p.id;
+  document.getElementById('cfg-id').disabled = true;
+  document.getElementById('cfg-sku').value = p.sku;
+  document.getElementById('cfg-name').value = p.name;
+  document.getElementById('cfg-variacao').value = p.variacao;
+  document.getElementById('cfg-unid').value = p.unid;
+  document.getElementById('cfg-desc').value = p.desc;
+  document.getElementById('cfg-barcode').value = p.barcode;
+  document.getElementById('cfg-unit').value = p.unit||0;
+  document.getElementById('cfg-min').value = p.min!==null?p.min:'';
+  document.getElementById('cfg-qty').value = p.qty;
+  document.getElementById('cfg-saude').value = p.saude||'';
+  document.getElementById('cfg-usadobh').value = p.usado_bh?'true':'false';
+  renderCfgTable();
+}
+
+function cfgNewProduct() {
+  cfgSelId = null; cfgIsNew = true;
+  document.getElementById('cfgFormTitle').textContent = 'Novo Produto';
+  document.getElementById('cfgSectionLbl').textContent = 'Dados do Novo Produto';
+  document.getElementById('cfgBtnDel').style.display = 'none';
+  document.getElementById('cfgEmptyMsg').style.display = 'none';
+  document.getElementById('cfgFormFields').style.display = 'block';
+  document.getElementById('cfg-id').value = '';
+  document.getElementById('cfg-id').disabled = false;
+  document.getElementById('cfg-sku').value = '';
+  document.getElementById('cfg-name').value = '';
+  document.getElementById('cfg-variacao').value = 'Capinha';
+  document.getElementById('cfg-unid').value = 'Unid';
+  document.getElementById('cfg-desc').value = '';
+  document.getElementById('cfg-barcode').value = '';
+  document.getElementById('cfg-unit').value = '';
+  document.getElementById('cfg-min').value = '';
+  document.getElementById('cfg-qty').value = 0;
+  document.getElementById('cfg-saude').value = 'OK';
+  document.getElementById('cfg-usadobh').value = 'true';
+}
+
+function cfgSave() {
+  const id = document.getElementById('cfg-id').value.trim();
+  const sku = document.getElementById('cfg-sku').value.trim();
+  const name = document.getElementById('cfg-name').value.trim();
+  if(!id){toast('Informe o código.',true);return;}
+  if(!name){toast('Informe o nome do produto.',true);return;}
+  if(cfgIsNew && products.find(p=>p.id===id)){toast('Código já existe.',true);return;}
+
+  const data = {
+    id, sku,
+    name,
+    variacao: document.getElementById('cfg-variacao').value,
+    unid: document.getElementById('cfg-unid').value.trim()||'Unid',
+    desc: document.getElementById('cfg-desc').value.trim()||name,
+    barcode: document.getElementById('cfg-barcode').value.trim()||'',
+    unit: parseFloat(document.getElementById('cfg-unit').value)||0,
+    min: document.getElementById('cfg-min').value!==''?parseInt(document.getElementById('cfg-min').value):null,
+    qty: parseFloat(document.getElementById('cfg-qty').value)||0,
+    saude: document.getElementById('cfg-saude').value,
+    usado_bh: document.getElementById('cfg-usadobh').value==='true',
+    inicial: parseFloat(document.getElementById('cfg-qty').value)||0,
+  };
+
+  if(cfgIsNew) {
+    products.push(data);
+    cfgSelId = id; cfgIsNew = false;
+    document.getElementById('cfg-id').disabled = true;
+    document.getElementById('cfgBtnDel').style.display = '';
+    toast(`✓ Produto "${name}" criado com sucesso!`);
+  } else {
+    const idx = products.findIndex(p=>p.id===cfgSelId);
+    products[idx] = {...products[idx], ...data};
+    toast(`✓ "${name}" atualizado com sucesso!`);
+  }
+  render(); updateKPIs(); renderCfgTable();
+}
+
+function cfgConfirmDelete() {
+  const p = products.find(x=>x.id===cfgSelId);
+  if(!p) return;
+  document.getElementById('modalTitle').textContent = 'Excluir produto';
+  document.getElementById('modalBody').innerHTML = `Tem certeza que deseja excluir <strong style="color:var(--text)">"${p.name} · ${p.variacao}"</strong>? Esta ação não pode ser desfeita.`;
+  document.getElementById('modalConfirmBtn').onclick = () => { cfgDelete(); closeModal(); };
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function cfgDelete() {
+  const p = products.find(x=>x.id===cfgSelId);
+  products = products.filter(x=>x.id!==cfgSelId);
+  cfgSelId = null; cfgIsNew = false;
+  document.getElementById('cfgEmptyMsg').style.display = '';
+  document.getElementById('cfgFormFields').style.display = 'none';
+  render(); updateKPIs(); renderCfgTable();
+  toast(`"${p.name}" removido.`,'warn');
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+
+// ═══ EXPORT ═══
+function exportEstoque() {
+  const now = new Date();
+  const estoqueData = products.map(p => ({
+    'Cód':p.id,'SKU':p.sku,'Produto':p.name,'Variação':p.variacao,'Descrição':p.desc,
+    'Unid. Medida':p.unid,'Saldo Atual':p.qty,'Estoque Mínimo':p.min??'',
+    'Valor Unitário (R$)':p.unit||0,
+    'Valor em Estoque (R$)':p.qty>0&&p.unit?parseFloat((p.qty*p.unit).toFixed(2)):0,
+    'Status':p.saude||'—','Usado em BH':p.usado_bh?'Sim':'Não','Cód. Barras':p.barcode,
+  }));
+  const alertas = products.filter(p=>p.saude==='NÃO OK'||p.saude==='ATENÇÃO'||p.qty<0).map(p=>({
+    'Cód':p.id,'SKU':p.sku,'Produto':p.name,'Variação':p.variacao,
+    'Saldo Atual':p.qty,'Estoque Mínimo':p.min??'—',
+    'Diferença p/ Mínimo':p.min!==null?p.qty-p.min:'—',
+    'Status':p.qty<0?'SALDO NEGATIVO':p.saude,'Valor Unitário (R$)':p.unit||0,
+  }));
+  const variacoes=[...new Set(products.map(p=>p.variacao))];
+  const resumo=variacoes.map(v=>{
+    const items=products.filter(p=>p.variacao===v);
+    return {'Variação':v,'Qtd SKUs':items.length,'Saldo Total':items.reduce((s,p)=>s+Math.max(p.qty,0),0),
+      'Valor Total (R$)':parseFloat(items.reduce((s,p)=>s+Math.max(p.qty,0)*(p.unit||0),0).toFixed(2)),
+      'SKUs Não OK':items.filter(p=>p.saude==='NÃO OK').length,'SKUs Atenção':items.filter(p=>p.saude==='ATENÇÃO').length,
+      'Saldo Negativo':items.filter(p=>p.qty<0).length};
+  });
+  const wb=XLSX.utils.book_new();
+  const mkSheet=d=>{const ws=XLSX.utils.json_to_sheet(d);ws['!cols']=Object.keys(d[0]||{}).map(k=>({wch:Math.max(k.length,12)}));return ws;};
+  XLSX.utils.book_append_sheet(wb,mkSheet(estoqueData),'Estoque Completo');
+  XLSX.utils.book_append_sheet(wb,mkSheet(alertas.length?alertas:[{'Info':'Nenhum alerta'}]),'Alertas');
+  XLSX.utils.book_append_sheet(wb,mkSheet(resumo),'Resumo por Variação');
+  XLSX.writeFile(wb,`EstoqueLog_${now.toISOString().slice(0,10)}.xlsx`);
+  toast('✓ Estoque exportado!');
+}
+
+function exportHistorico() {
+  if(!history.length){toast('Nenhuma movimentação.',true);return;}
+  const now=new Date();
+  const data=history.map((h,i)=>({'#':i+1,'Data':h.data,'Depósito':h.deposito,'Produto':h.name,'Variação':h.variacao,'SKU':h.sku,
+    'Tipo':h.tipo==='saida'?'Saída':h.tipo==='entrada'?'Entrada':'Ajuste','Quantidade':h.qty,
+    'Saldo Antes':h.antes,'Saldo Depois':h.depois,'Responsável':h.resp,'Motivo':h.motivo||''}));
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=Object.keys(data[0]).map(k=>({wch:Math.max(k.length,14)}));
+  XLSX.utils.book_append_sheet(wb,ws,'Histórico');
+  XLSX.writeFile(wb,`Historico_Movimentacoes_${now.toISOString().slice(0,10)}.xlsx`);
+  toast('✓ Histórico exportado!');
+}
+
+function toast(msg,type=false) {
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast'+(type===true?' err':type==='warn'?' warn':'');
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ═══ CSV IMPORT ═══
+let csvParsed = [];
+
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { toast('CSV vazio ou inválido.', true); return; }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+    csvParsed = [];
+    const errors = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g,''));
+      const row = {};
+      headers.forEach((h, idx) => row[h] = vals[idx] || '');
+
+      const cod = row['Cod'] || row['Código'] || row['cod'] || '';
+      const sku = row['SKU'] || row['sku'] || '';
+      const name = row['Categoria'] || row['Nome'] || row['nome'] || '';
+      if (!cod && !sku && !name) continue;
+
+      const parseQty = v => { const n = parseFloat((v||'').replace(',','.')); return isNaN(n) ? 0 : n; };
+      const parseBRL = v => { const n = parseFloat((v||'').replace('R$','').replace('.','').replace(',','.')); return isNaN(n) ? 0 : n; };
+      const parseMin = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
+
+      csvParsed.push({
+        id: cod || String(Date.now() + i),
+        sku: sku,
+        name: name,
+        variacao: row['Item/Variação'] || row['Variação'] || 'Genérico',
+        unid: row['Unid. Medida'] || row['Unid'] || 'Unid',
+        qty: parseQty(row['Estoque Saldo'] || row['Estoque'] || '0'),
+        min: parseMin(row['Estoque mínimo'] || row['Min'] || ''),
+        unit: parseBRL(row['Valor unitário'] || row['Valor'] || '0'),
+        saude: row['Saúde do Saldo'] || row['Status'] || '',
+        usado_bh: (row['Utilizado em BH?'] || '').toLowerCase() === 'sim',
+        desc: row['Descrisção do Item'] || row['Descricao'] || name,
+        barcode: row['Código de Barras'] || row['Barcode'] || '',
+      });
+    }
+
+    if (csvParsed.length === 0) { toast('Nenhum produto encontrado no CSV.', true); return; }
+
+    // Show preview modal
+    const preview = document.getElementById('csvPreview');
+    preview.innerHTML = `
+      <div style="background:rgba(0,214,143,.08);border:1px solid rgba(0,214,143,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--green);">
+        ✓ <strong>${csvParsed.length} produtos</strong> encontrados no arquivo.<br>
+        <span style="color:var(--muted);">Como deseja importar?</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+          <input type="radio" name="csvMode" value="replace" checked> Substituir toda a lista
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+          <input type="radio" name="csvMode" value="merge"> Mesclar (manter existentes)
+        </label>
+      </div>`;
+    document.getElementById('csvError').style.display = 'none';
+    document.getElementById('csvModal').style.display = 'flex';
+  };
+  reader.readAsText(file, 'UTF-8');
+  event.target.value = '';
+}
+
+function closeCsvModal() {
+  document.getElementById('csvModal').style.display = 'none';
+  csvParsed = [];
+}
+
+function confirmCsvImport() {
+  if (!csvParsed.length) return;
+  const mode = document.querySelector('input[name="csvMode"]:checked')?.value || 'merge';
+  if (mode === 'replace') {
+    products = csvParsed;
+  } else {
+    const existing = new Map(products.map(p => [p.id, p]));
+    csvParsed.forEach(p => existing.set(p.id, p));
+    products = Array.from(existing.values());
+  }
+  render(); updateKPIs(); renderCfgTable();
+  closeCsvModal();
+  toast(`✓ ${csvParsed.length} produtos importados com sucesso!`);
+}
+
+// ═══ CHARTS ═══
+let chartBar = null, chartPie = null, chartDepo = null;
+
+function getChartFiltered() {
+  const from = document.getElementById('chartFrom').value;
+  const to = document.getElementById('chartTo').value;
+  const dep = document.getElementById('chartDeposito').value;
+  return history.filter(h => {
+    if (dep && h.deposito !== dep) return false;
+    if (from || to) {
+      // parse dd/mm/yyyy
+      const parts = h.data.split('/');
+      if (parts.length === 3) {
+        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        if (from && d < new Date(from)) return false;
+        if (to && d > new Date(to + 'T23:59:59')) return false;
+      }
+    }
+    return true;
+  });
+}
+
+function resetChartFilter() {
+  document.getElementById('chartFrom').value = '';
+  document.getElementById('chartTo').value = '';
+  document.getElementById('chartDeposito').value = '';
+  renderCharts();
+}
+
+function renderCharts() {
+  const data = getChartFiltered();
+  document.getElementById('chartBadge').textContent = `${data.length} registros`;
+
+  // KPIs
+  const entradas = data.filter(h => h.tipo === 'entrada');
+  const saidas = data.filter(h => h.tipo === 'saida');
+  const ajustes = data.filter(h => h.tipo === 'ajuste');
+  document.getElementById('ck-entrada').textContent = entradas.reduce((s,h) => s + h.qty, 0);
+  document.getElementById('ck-saida').textContent = saidas.reduce((s,h) => s + h.qty, 0);
+  document.getElementById('ck-ajuste').textContent = ajustes.length;
+  document.getElementById('ck-total').textContent = data.length;
+
+  // Chart defaults
+  Chart.defaults.color = '#5a637a';
+  Chart.defaults.borderColor = '#242a38';
+  Chart.defaults.font.family = "'DM Mono', monospace";
+
+  // ── BAR CHART: movimentações por dia ──
+  const dayMap = {};
+  data.forEach(h => {
+    const d = h.data;
+    if (!dayMap[d]) dayMap[d] = { entrada: 0, saida: 0, ajuste: 0 };
+    dayMap[d][h.tipo] += h.qty;
+  });
+  const days = Object.keys(dayMap).sort((a,b) => {
+    const pa = a.split('/'), pb = b.split('/');
+    return new Date(`${pa[2]}-${pa[1]}-${pa[0]}`) - new Date(`${pb[2]}-${pb[1]}-${pb[0]}`);
+  });
+
+  if (chartBar) chartBar.destroy();
+  const ctxBar = document.getElementById('chartBar').getContext('2d');
+  chartBar = new Chart(ctxBar, {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [
+        { label: 'Entradas', data: days.map(d => dayMap[d].entrada), backgroundColor: 'rgba(0,214,143,.7)', borderRadius: 4 },
+        { label: 'Saídas', data: days.map(d => dayMap[d].saida), backgroundColor: 'rgba(255,77,109,.7)', borderRadius: 4 },
+        { label: 'Ajustes', data: days.map(d => dayMap[d].ajuste), backgroundColor: 'rgba(255,183,3,.7)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#5a637a', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: '#242a38' }, ticks: { color: '#5a637a', font: { size: 10 } } },
+        y: { grid: { color: '#242a38' }, ticks: { color: '#5a637a', font: { size: 10 } }, beginAtZero: true }
+      }
+    }
+  });
+
+  const emptyEl = document.getElementById('chartBarEmpty');
+  if (emptyEl) emptyEl.style.display = days.length === 0 ? 'flex' : 'none';
+
+  // ── PIE CHART: por tipo ──
+  if (chartPie) chartPie.destroy();
+  const ctxPie = document.getElementById('chartPie').getContext('2d');
+  chartPie = new Chart(ctxPie, {
+    type: 'doughnut',
+    data: {
+      labels: ['Entradas', 'Saídas', 'Ajustes'],
+      datasets: [{
+        data: [entradas.length, saidas.length, ajustes.length],
+        backgroundColor: ['rgba(0,214,143,.8)', 'rgba(255,77,109,.8)', 'rgba(255,183,3,.8)'],
+        borderColor: '#111318', borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#5a637a', font: { size: 11 }, padding: 12 } }
+      }
+    }
+  });
+
+  // ── BAR CHART: por depósito ──
+  const deps = ['BSB - Brasília', 'BH - Belo Horizonte (Mangue)', 'BH - Belo Horizonte (Manguezal)'];
+  const depLabels = ['BSB', 'BH Mangue', 'BH Manguezal'];
+  const depData = { entrada: [], saida: [], ajuste: [] };
+  deps.forEach(dep => {
+    const sub = data.filter(h => h.deposito === dep);
+    depData.entrada.push(sub.filter(h => h.tipo === 'entrada').reduce((s,h) => s+h.qty, 0));
+    depData.saida.push(sub.filter(h => h.tipo === 'saida').reduce((s,h) => s+h.qty, 0));
+    depData.ajuste.push(sub.filter(h => h.tipo === 'ajuste').length);
+  });
+
+  if (chartDepo) chartDepo.destroy();
+  const ctxDepo = document.getElementById('chartDepo').getContext('2d');
+  chartDepo = new Chart(ctxDepo, {
+    type: 'bar',
+    data: {
+      labels: depLabels,
+      datasets: [
+        { label: 'Entradas', data: depData.entrada, backgroundColor: 'rgba(0,214,143,.7)', borderRadius: 4 },
+        { label: 'Saídas', data: depData.saida, backgroundColor: 'rgba(255,77,109,.7)', borderRadius: 4 },
+        { label: 'Ajustes', data: depData.ajuste, backgroundColor: 'rgba(255,183,3,.7)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#5a637a', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: '#242a38' }, ticks: { color: '#5a637a', font: { size: 10 } } },
+        y: { grid: { color: '#242a38' }, ticks: { color: '#5a637a', font: { size: 10 } }, beginAtZero: true }
+      }
+    }
+  });
+
+  // ── TABLE ──
+  const tbody = document.getElementById('chartTbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;color:var(--muted);text-align:center;font-size:12px;">Nenhuma movimentação no período.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(h => {
+    const color = h.tipo==='entrada'?'var(--green)':h.tipo==='saida'?'var(--red)':'var(--yellow)';
+    const sign = h.tipo==='entrada'?'+':h.tipo==='saida'?'-':'=';
+    const label = h.tipo==='entrada'?'Entrada':h.tipo==='saida'?'Saída':'Ajuste';
+    return `<tr style="border-bottom:1px solid rgba(36,42,56,.6);">
+      <td style="padding:9px 12px;font-size:11px;color:var(--muted);">${h.data}</td>
+      <td style="padding:9px 12px;font-size:12px;">${h.name} <span style="font-size:10px;color:var(--muted)">${h.variacao||''}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:var(--muted);">${h.deposito||'—'}</td>
+      <td style="padding:9px 12px;"><span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${color}22;color:${color}">${label}</span></td>
+      <td style="padding:9px 12px;text-align:right;font-family:var(--fh);font-weight:700;color:${color}">${sign}${h.qty}</td>
+      <td style="padding:9px 12px;font-size:11px;color:var(--muted);">${h.resp||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportHistoricoFiltrado() {
+  const data = getChartFiltered();
+  if (!data.length) { toast('Nenhum dado para exportar.', true); return; }
+  const rows = data.map((h,i) => ({'#':i+1,'Data':h.data,'Depósito':h.deposito||'','Produto':h.name,'Variação':h.variacao||'','SKU':h.sku||'',
+    'Tipo':h.tipo==='saida'?'Saída':h.tipo==='entrada'?'Entrada':'Ajuste','Quantidade':h.qty,
+    'Saldo Antes':h.antes,'Saldo Depois':h.depois,'Responsável':h.resp,'Motivo':h.motivo||''}));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]).map(k => ({wch:Math.max(k.length,14)}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Histórico Filtrado');
+  XLSX.writeFile(wb, `Historico_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('✓ Exportado com sucesso!');
+}
+
